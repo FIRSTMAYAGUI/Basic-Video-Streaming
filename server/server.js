@@ -1,5 +1,4 @@
 import express from "express";
-import { fstat } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from 'fs'
@@ -30,22 +29,32 @@ app.get('/video', (req, res) => {
     // Send standard 200 OK with res.sendFile() or pipe full stream
 
     //console.log('the video path is: ',videoPath)
-    res.status(200).sendFile(videoPath);
-
+    return res.status(200).sendFile(videoPath);
   }
 
-  const videoStat = fs.statSync(videoPath);
+  const videoSize = fs.statSync(videoPath).size;
   console.log('the range is: ', range);
   const rangeExtraction = range?.replace('bytes=', '').split('-')
   console.log(rangeExtraction);
 
   const start = parseInt(rangeExtraction?.[0]);
-  const end = rangeExtraction?.[1] ? parseInt(rangeExtraction?.[1]) : videoStat.size;
+  const end = rangeExtraction?.[1] ? parseInt(rangeExtraction?.[1]) : videoSize-1;
 
+  const contentLength = end - start + 1;
   
-  console.log('the video size is: ', videoStat.size);
-  console.log('the start is: ', typeof start, 'and the end is: ',typeof end);
-  res.status(206);
+  console.log('the video size is: ', videoSize);
+  console.log('content length: ', contentLength);
+  console.log('the start is: ',  start, 'and the end is: ', end);
+
+  const videoStream = fs.createReadStream(videoPath, {start, end});
+  videoStream.pipe(res);
+
+  return res.status(206).set({
+    'Content-Range': `bytes ${start}-${end}/${videoSize}`,
+    'Accept-Ranges': 'bytes',
+    'Content-Length': contentLength,
+    'Content-Type': 'video/mp4',
+  });
 });
 
 app.listen(port, () => {
