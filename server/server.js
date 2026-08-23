@@ -14,22 +14,14 @@ const Dirname = path.dirname(Filename);  // 3. Get directory path
 //console.log("filename: ", Filename, "and dirname: ", Dirname);
 
 app.get('/video', (req, res) => {
-  const BrowserHeaders = req.headers;
-  //console.log("This is a browser header: ", BrowserHeaders);
-  // 1. Check for the Range header
   const range = req.headers.range;
-  const videoPath = path.join(Dirname, "videos", "COTE_S1_EP1_VF_Extract.mp4");
+  const videoPath = path.join(Dirname, "videos", "The_FULL_2024_NBA_SlamDunk_Contest!.mp4");
 
   if (!range) {
     console.log('No range');
-    // ----------------------------------------------------
-    // PATH 1: No Range header (Fallback)
-    // ----------------------------------------------------
-    // The client just wants the whole file at once.
-    // Send standard 200 OK with res.sendFile() or pipe full stream
 
     //console.log('the video path is: ',videoPath)
-    return res.status(200).sendFile(videoPath);
+    return res.status(200).send(videoPath);
   }
 
   const videoSize = fs.statSync(videoPath).size;
@@ -46,15 +38,15 @@ app.get('/video', (req, res) => {
   console.log('content length: ', contentLength);
   console.log('the start is: ',  start, 'and the end is: ', end);
 
-  const videoStream = fs.createReadStream(videoPath, {start, end});
-  videoStream.pipe(res);
-
-  return res.status(206).set({
+  res.status(206).set({
     'Content-Range': `bytes ${start}-${end}/${videoSize}`,
     'Accept-Ranges': 'bytes',
     'Content-Length': contentLength,
     'Content-Type': 'video/mp4',
   });
+
+  const videoStream = fs.createReadStream(videoPath, {start, end});
+  videoStream.pipe(res);
 });
 
 app.listen(port, () => {
