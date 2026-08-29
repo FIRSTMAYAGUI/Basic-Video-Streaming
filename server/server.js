@@ -1,17 +1,22 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from 'cors'
 import fs from 'fs'
 const app = express();
 const port = 3000;
 
-app.get('/', (req, res) => {
-  res.send('Hello World! yo');
-});
-
 const Filename = fileURLToPath(import.meta.url); // 2. Get current file path
 const Dirname = path.dirname(Filename);  // 3. Get directory path
 //console.log("filename: ", Filename, "and dirname: ", Dirname);
+app.use(cors());
+
+// Serve everything inside the "public" folder at the root path
+app.use(express.static(path.join(Dirname, 'videos')));
+
+app.get('/', (req, res) => {
+  res.send('Hello World! yo');
+});
 
 app.get('/video', (req, res) => {
   const range = req.headers.range;
@@ -21,7 +26,7 @@ app.get('/video', (req, res) => {
     console.log('No range');
 
     //console.log('the video path is: ',videoPath)
-    return res.status(200).send(videoPath);
+    return res.status(200).sendFile(videoPath);
   }
 
   const videoSize = fs.statSync(videoPath).size;
