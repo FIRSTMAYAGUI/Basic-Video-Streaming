@@ -7,39 +7,32 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 </head>
 <body>
-    <video  id="video" controls >
+    <video  id="video" controls autoplay>
     </video>
 
     <script>
-    let video = document.getElementById('video');
-    let hls = new Hls();
-      if (Hls.isSupported()) {
-
-            // If you are using the ESM version of the library (hls.mjs), you
-            // should specify the "workerPath" config option here if you want
-            // web workers to be used. Note that bundlers (such as webpack)
-            // will likely use the ESM version by default.
-
-            // bind them together
-            hls.attachMedia(video);
-            // MEDIA_ATTACHED event is fired by hls object once MediaSource is ready
-            hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-                console.log('video and hls.js are now bound together !');
-            });
-        }
-
+        const video = document.getElementById('video');
+        
         if (Hls.isSupported()) {
+            const hls = new Hls();
+
             hls.on(Hls.Events.MEDIA_ATTACHED, function () {
             console.log('video and hls.js are now bound together !');
             });
+
             hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-            console.log(
-                'manifest loaded, found ' + data.levels.length + ' quality level',
-            );
+                console.log(
+                    'manifest loaded, found ' + data.levels.length + ' quality level',
+                );
             });
+            
             hls.loadSource('http://localhost:3000/test-video/outputVideoFile.m3u8');
             // bind them together
             hls.attachMedia(video);
+        }
+        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Fallback for Safari (native HLS support)
+            video.src = 'http://localhost:3000/test-video/outputVideoFile.m3u8';
         }
     </script>
 </body>
