@@ -3,6 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from 'cors'
 import fs from 'fs'
+import { exec, spawn } from 'child_process';
+import { once } from 'events';
 const app = express();
 const port = 3000;
 
@@ -15,7 +17,35 @@ app.use(cors());
 app.use(express.static(path.join(Dirname, 'videos')));
 
 app.get('/', (req, res) => {
-  res.send('Hello World! yo');
+  res.send('Hello World! yo')
+});
+
+app.get('/convert', (req, res) => {
+  const inputVideo = path.join(Dirname, "videos", "COTE_S1_EP1_VF_Extract.mp4");
+  const outputPlaylist = path.join(Dirname, "videos/test-video2", "outputPlaylist.m3u8");
+
+  // Make sure output folder exists
+  fs.mkdirSync(path.join(Dirname, "videos/test-video2"), { recursive: true });
+
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', inputVideo,
+    '-c:v', 'h264',
+    '-flags', '+cgop',
+    '-g', '30',
+    '-hls_time', '60',
+    '-hls_list_size', '0',
+    outputPlaylist
+  ]);
+
+  ffmpeg.on('close', (code) => {
+    if (code === 0) {
+      res.send('Conversion complete! HLS files ready.');
+      console.log('Conversion complete! HLS files ready.');
+    } else {
+      res.status(500).send('FFmpeg failed.');
+      console.log('FFmpeg failed.');
+    }
+  });
 });
 
 app.get('/video', (req, res) => {
@@ -26,10 +56,10 @@ app.get('/video', (req, res) => {
     console.log('No range');
 
     //console.log('the video path is: ',videoPath)
-    return res.status(200).sendFile(videoPath);
+    return res.status(200).sendFile(testVideoPath);
   }
 
-  const videoSize = fs.statSync(videoPath).size;
+  const videoSize = fs.statSync(testVideoPath).size;
   console.log('the range is: ', range);
   const rangeExtraction = range?.replace('bytes=', '').split('-')
   console.log(rangeExtraction);
