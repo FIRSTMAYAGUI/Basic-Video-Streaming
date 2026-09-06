@@ -14,12 +14,24 @@
         const video = document.getElementById('video');
         
         if (Hls.isSupported()) {
-            const hls = new Hls();
+            const hls = new Hls(
+                {
+                    // Force hls.js to start at a low initial bandwidth estimate (e.g. 100 kbps)
+                    abrEmaDefaultBitrate: 100000, 
+                    
+                    // Make the bandwidth estimator react immediately to real download times
+                    abrEmaFastLive: 1.0,
+                    abrEmaSlowLive: 1.0,
+
+                    // Start with the lowest level initially
+                    startLevel: 0
+                }
+            );
 
             hls.on(Hls.Events.MEDIA_ATTACHED, function () {
             console.log('video and hls.js are now bound together !');
             });
-            
+
             hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
                 const currentLevel = hls.levels[data.level];
                 console.log(`[ABR] Switched to Level ${data.level}:`);
