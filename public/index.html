@@ -3,33 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Video Stream & Upload</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 </head>
 <body>
-    <video  id="video" controls autoplay>
-    </video>
+
+    <!-- Upload Form -->
+    <form action="http://localhost:3000/upload" method="POST" enctype="multipart/form-data">
+        <label for="videoFile">Select a video to upload:</label>
+        <input type="file" id="videoFile" name="video" accept="video/*" required>
+        <button type="submit">Upload & Convert</button>
+    </form>
+
+    <hr>
+
+    <!-- Video Player -->
+    <video id="video" controls autoplay></video>
 
     <script>
         const video = document.getElementById('video');
         
         if (Hls.isSupported()) {
-            const hls = new Hls(
-                {
-                    // Force hls.js to start at a low initial bandwidth estimate (e.g. 100 kbps)
-                    abrEmaDefaultBitrate: 100000, 
-                    
-                    // Make the bandwidth estimator react immediately to real download times
-                    abrEmaFastLive: 1.0,
-                    abrEmaSlowLive: 1.0,
+            const hls = new Hls({
+                // Force hls.js to start at a low initial bandwidth estimate (e.g. 100 kbps)
+                abrEmaDefaultBitrate: 100000, 
+                
+                // Make the bandwidth estimator react immediately to real download times
+                abrEmaFastLive: 1.0,
+                abrEmaSlowLive: 1.0,
 
-                    // Start with the lowest level initially
-                    startLevel: 0
-                }
-            );
+                // Start with the lowest level initially
+                startLevel: 0
+            });
 
             hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-            console.log('video and hls.js are now bound together !');
+                console.log('video and hls.js are now bound together !');
             });
 
             hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
