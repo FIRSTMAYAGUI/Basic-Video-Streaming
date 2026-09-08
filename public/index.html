@@ -9,11 +9,11 @@
 <body>
 
     <!-- Upload Form -->
-    <form action="http://localhost:3000/upload" method="POST" enctype="multipart/form-data">
+    <form id="uploadForm">
         <label for="videoFile">Select a video to upload:</label>
         <br>
         <input type="file" id="videoFile" name="video" accept="video/*" required>
-        <button type="submit">Upload & Convert</button>
+        <button type="submit" id="submitBtn">Upload & Convert</button>
     </form>
 
     <hr>
@@ -23,45 +23,97 @@
 
     <script>
         const video = document.getElementById('video');
-        
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                // Force hls.js to start at a low initial bandwidth estimate (e.g. 100 kbps)
-                abrEmaDefaultBitrate: 100000, 
+        const uploadForm = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        let hls;
+
+        // Function to initialize or update the HLS stream
+        function playStream(playlistUrl) {
+            if (Hls.isSupported()) {
+                if (hls) {
+                    hls.destroy(); // Clean up existing player instance before loading a new video
+                }
+
+                hls = new Hls({
+                    abrEmaDefaultBitrate: 100000, 
+                    abrEmaFastLive: 1.0,
+                    abrEmaSlowLive: 1.0,
+                    startLevel: 0
+                });
+
+                hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                    console.log('video and hls.js are now bound together !');
+                });
+
+                hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
+                    const currentLevel = hls.levels[data.level];
+                    console.log(`[ABR] Switched to Level ${data.level}:`);
+                    console.log(`  -> Resolution: ${currentLevel.width}x${currentLevel.height}`);
+                    console.log(`  -> Bandwidth: ${currentLevel.bitrate} bps`);
+                });
+
+                hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                    console.log('manifest loaded, found ' + data.levels.length + ' quality level');
+                });
                 
-                // Make the bandwidth estimator react immediately to real download times
-                abrEmaFastLive: 1.0,
-                abrEmaSlowLive: 1.0,
-
-                // Start with the lowest level initially
-                startLevel: 0
-            });
-
-            hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-                console.log('video and hls.js are now bound together !');
-            });
-
-            hls.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
-                const currentLevel = hls.levels[data.level];
-                console.log(`[ABR] Switched to Level ${data.level}:`);
-                console.log(`  -> Resolution: ${currentLevel.width}x${currentLevel.height}`);
-                console.log(`  -> Bandwidth: ${currentLevel.bitrate} bps`);
-            });
-
-            hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-                console.log(
-                    'manifest loaded, found ' + data.levels.length + ' quality level',
-                );
-            });
-            
-            hls.loadSource('http://localhost:3000/masterPlaylist.m3u8');
-            // bind them together
-            hls.attachMedia(video);
+                hls.loadSource(playlistUrl);
+                hls.attachMedia(video);
+            } 
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Fallback for Safari
+                video.src = playlistUrl;
+            }
         }
-        else {
-            // Fallback for Safari (native HLS support)
-            video.src = 'http://localhost:3000/test-video2/masterPlaylist.m3u8';
-        }
+
+        // Handle AJAX form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Stop default form redirect/reload
+
+            const fileInput = document.getElementById('videoFile');
+            if (!fileInput.files[0]) {
+                console.log(!fileInput.files[0])
+                return
+            };
+
+            // 1. Package the form data
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+
+            // 2. UI Loading State
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading & Processing...';
+
+            try {
+                // 3. Send AJAX request to Express
+                const response = await fetch('http://localhost:3000/upload', {
+                    method: 'POST',
+                    body: formData // Do NOT manually set Content-Type header; browser does it automatically with boundary
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed with status: ${response.status}`);
+                    console.log(`Upload failed with status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Server response:', data);
+
+                // 4. Play the newly generated video stream automatically
+                if (data.playlistUrl) {
+                    console.log(data.playlistUrl)
+                    playStream(data.playlistUrl);
+                }
+
+            } catch (error) {
+                console.error('Error uploading video:', error);
+                alert('Video upload or conversion failed. Check console for logs.');
+            } finally {
+                // 5. Reset UI State
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Upload & Convert';
+            }
+        });
     </script>
 </body>
 </html>

@@ -6,19 +6,27 @@ import fs from 'fs'
 import { exec, spawn } from 'child_process';
 import { once } from 'events';
 import multer from 'multer';
+import crypto from 'crypto';
 
 const app = express();
 const port = 3000;
 
 const Filename = fileURLToPath(import.meta.url); // 2. Get current file path
 const Dirname = path.dirname(Filename);  // 3. Get directory path
-//console.log("filename: ", Filename, "and dirname: ", Dirname);
+console.log("filename: ", Filename, "and dirname: ", Dirname);
+
+// Ensure upload destination folder exists
+const uploadDir = path.join(Dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({ dest: uploadDir });
+
 app.use(cors());
 
 // Serve everything inside the "public" folder at the root path
 app.use(express.static(path.join(Dirname, 'videos')));
-
-const upload = multer({ dest: path.join(Dirname, 'uploads/') });
 
 app.get('/', (req, res) => {
   res.send('Hello World! yo')
@@ -30,21 +38,51 @@ app.post('/upload', upload.single('video'), (req, res) => {
     return res.status(400).send('No video file uploaded.');
   }
 
-  console.log('File uploaded successfully:');
-  console.log('Original Name:', req.file.originalname);
-  console.log('Saved Path:', req.file.path);
+  // 1. Generate a unique ID for this video (avoids collisions and dangerous characters)
+  const videoId = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  
+  // 2. Define output directory inside "videos/"
+  const outputDir = path.join(Dirname, 'videos', videoId);
+  fs.mkdirSync(outputDir, { recursive: true });
 
-  // req.file details will look like this:
-  // req.file.path -> '.../uploads/3a8c7b6d1e...' (temporary file location)
+  const outputPlaylist = path.join(outputDir, 'outputFile.m3u8');
+  const inputVideoPath = req.file.path; // Path saved by Multer
 
-  /* res.send({
-    message: 'Video uploaded successfully!',
-    fileInfo: {
-      originalName: req.file.originalname,
-      tempPath: req.file.path,
-      size: req.file.size
+  console.log(`[Processing] Starting FFmpeg for video ID: ${videoId}`);
+
+  // 3. Trigger FFmpeg with Multer's saved file path
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', inputVideoPath,
+    '-c:v', 'h264',
+    '-flags', '+cgop',
+    '-g', '30',
+    '-hls_time', '10',
+    '-hls_list_size', '0',
+    outputPlaylist
+  ]);
+
+  ffmpeg.stderr.on('data', (data) => {
+    console.log(`FFmpeg Progress: ${data}`); // Optional: uncomment for progress logs
+  });
+
+  ffmpeg.on('close', (code) => {
+    // 4. Clean up the temporary uploaded source file after processing
+    if (fs.existsSync(inputVideoPath)) {
+      fs.unlinkSync(inputVideoPath);
     }
-  }); */
+
+    if (code === 0) {
+      console.log(`[Success] Conversion complete for: ${videoId}`);
+      res.send({
+        message: 'Video uploaded and converted successfully!',
+        videoId: videoId,
+        playlistUrl: `http://localhost:3000/${videoId}/outputFile.m3u8`
+      });
+    } else {
+      console.error(`[Error] FFmpeg process failed with code ${code}`);
+      res.status(500).send('Video processing failed.');
+    }
+  });
 });
 
 /* app.get('/convert', (req, res) => {
